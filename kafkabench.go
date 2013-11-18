@@ -25,6 +25,9 @@ var (
 	producerConfig = sarama.ProducerConfig{
 		Timeout: 1000,
 	}
+	consumerConfig = sarama.ConsumerConfig{
+		MaxWaitTime: 100, // milliseconds
+	}
 )
 
 func getClient(addr string) (client *sarama.Client) {
@@ -53,6 +56,24 @@ func produce(client *sarama.Client, topic string, events int) {
 	}
 }
 
+func consume(client *sarama.Client, topic string, events int) {
+	consumer, err := sarama.NewConsumer(client, topic, 0, "bench-group", &consumerConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer consumer.Close()
+
+	log.Printf("Reading %d events from '%s' topic", events, topic)
+	count := 0
+	for event := range consumer.Events() {
+		count++
+		if count == events {
+			log.Printf("Received final (%d) event: %s", count, string(event.Value))
+			return
+		}
+	}
+}
+
 func usage() {
 	flag.Usage()
 	fmt.Println()
@@ -69,5 +90,7 @@ func main() {
 
 	if flag.Args()[0] == "produce" {
 		produce(client, *topicName, *eventCount)
+	} else {
+		consume(client, *topicName, *eventCount)
 	}
 }
