@@ -106,9 +106,12 @@ func main() {
 	client := getClient(*brokerAddress)
 	defer client.Close()
 
+	now := time.Now()
 	if flag.Args()[0] == "produce" {
 		produce(client, *topicName, *eventCount)
 	} else {
 		consume(client, *topicName, *eventCount)
 	}
+	ellapsed := time.Now().Sub(now)
+	log.Printf("Finished in %s", ellapsed)
 }
