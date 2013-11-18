@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/Shopify/sarama"
@@ -11,7 +12,7 @@ import (
 const (
 	defaultBrokerAddress = "127.0.0.1:9092"
 	defaultTopicName     = "benchmark"
-	defaultEventCount    = 10000
+	defaultEventCount    = 100000
 	clientId             = string(iota)
 )
 
@@ -29,6 +30,12 @@ var (
 		MaxWaitTime: 100, // milliseconds
 	}
 )
+
+type DummyMessage struct {
+	Name   string
+	Body   string
+	Number int64
+}
 
 func getClient(addr string) (client *sarama.Client) {
 	addrs := make([]string, 1)
@@ -51,8 +58,14 @@ func produce(client *sarama.Client, topic string, events int) {
 
 	log.Printf("Sending %d messages to topic '%s'\n", events, topic)
 
+	message := DummyMessage{Name: "foo", Body: "bar", Number: 42}
+	encoded, err := json.Marshal(message)
+	if err != nil {
+		log.Fatal("Unable to JSON-encode dummy message", err)
+	}
+
 	for i := 0; i < events; i++ {
-		producer.SendMessage(nil, sarama.StringEncoder("hello, world"))
+		producer.SendMessage(nil, sarama.ByteEncoder(encoded))
 	}
 }
 
@@ -65,7 +78,12 @@ func consume(client *sarama.Client, topic string, events int) {
 
 	log.Printf("Reading %d events from '%s' topic", events, topic)
 	count := 0
+	var message DummyMessage
 	for event := range consumer.Events() {
+		if err := json.Unmarshal(event.Value, &message); err != nil {
+			log.Fatal("Unable to decode JSON message", err)
+		}
+
 		count++
 		if count == events {
 			log.Printf("Received final (%d) event: %s", count, string(event.Value))
