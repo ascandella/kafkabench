@@ -20,5 +20,5 @@ Running
 .. code-block:: bash
 
     $ go build
-    $ ./kafkabench produce 1000000
+    $ ./kafkabench produce
     $ ./kafkabench consume

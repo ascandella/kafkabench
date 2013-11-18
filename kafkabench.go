@@ -31,10 +31,28 @@ var (
 	}
 )
 
+type InnerMessage struct {
+	previousTimestamp   int64
+	timestamp           int64
+	metric              string
+	cityId              uint32
+	cityName            string
+	dummyId             uint32
+	dummyRating         float32
+	dummyStatus         string
+	maxDispatchDistance uint32
+	timeOpen            uint32
+	timeNotOnTrip       uint32
+	longitude           float32
+	latitude            float32
+	vehicleViewId       uint32
+	vehicleUUID         string
+}
+
 type DummyMessage struct {
-	Name   string
-	Body   string
-	Number int64
+	ts   float64
+	host string
+	msg  InnerMessage
 }
 
 func getClient(addr string) (client *sarama.Client) {
@@ -58,7 +76,21 @@ func produce(client *sarama.Client, topic string, events int) {
 
 	log.Printf("Sending %d messages to topic '%s'\n", events, topic)
 
-	message := DummyMessage{Name: "foo", Body: "bar", Number: 42}
+	message := DummyMessage{
+		ts:   1384205271.861,
+		host: "dummy.host",
+		msg: InnerMessage{
+			previousTimestamp: 1384205268645,
+			timestamp:         1384205271861,
+			metric:            "location",
+			cityId:            42,
+			cityName:          "foo",
+			vehicleViewId:     442,
+			vehicleUUID:       "aoeu-aoeu-aoeu-aoeu-aoeu",
+			timeNotOnTrip:     3430946,
+			dummyStatus:       "something",
+		},
+	}
 	encoded, err := json.Marshal(message)
 	if err != nil {
 		log.Fatal("Unable to JSON-encode dummy message", err)
