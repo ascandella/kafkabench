@@ -4,40 +4,38 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/Shopify/sarama"
 	"log"
 	"time"
+
+	"gopkg.in/shopify/sarama.v1"
 )
 
 const (
 	defaultBrokerAddress = "127.0.0.1:9092"
 	defaultTopicName     = "benchmark"
 	defaultEventCount    = 100000
-	clientId             = string(iota)
+	clientID             = string(iota)
 )
 
 var (
 	brokerAddress = flag.String("address", defaultBrokerAddress, "broker address to connect to")
 	eventCount    = flag.Int("events", defaultEventCount, "number of events to produce")
 	topicName     = flag.String("topic", defaultTopicName, "kafka topic to use")
-	clientConfig  = sarama.ClientConfig{
-		WaitForElection: time.Second,
-	}
-	producerConfig = sarama.ProducerConfig{
-		Timeout: 1000,
-	}
-	consumerConfig = sarama.ConsumerConfig{
-		MaxWaitTime: 100, // milliseconds
-	}
+	config        = sarama.NewConfig()
 )
 
-type InnerMessage struct {
+func init() {
+	config.Producer.Timeout = 1000
+	config.Consumer.MaxWaitTime = 100
+}
+
+type innerMessage struct {
 	previousTimestamp   int64
 	timestamp           int64
 	metric              string
-	cityId              uint32
+	cityID              uint32
 	cityName            string
-	dummyId             uint32
+	dummyID             uint32
 	dummyRating         float32
 	dummyStatus         string
 	maxDispatchDistance uint32
@@ -45,30 +43,30 @@ type InnerMessage struct {
 	timeNotOnTrip       uint32
 	longitude           float32
 	latitude            float32
-	vehicleViewId       uint32
+	vehicleViewID       uint32
 	vehicleUUID         string
 }
 
-type DummyMessage struct {
+type dummyMessage struct {
 	ts   float64
 	host string
-	msg  InnerMessage
+	msg  innerMessage
 }
 
-func getClient(addr string) (client *sarama.Client) {
-	addrs := make([]string, 1)
-	addrs[0] = addr
-	client, err := sarama.NewClient(clientId, addrs, &clientConfig)
+func getClient(addr string) *sarama.Client {
+	brokers := []string{*brokerAddress}
+	log.Println("Connecting to brokers: ", brokers)
 
-	log.Print("Connecting to brokers: ", addrs)
+	client, err := sarama.NewClient(brokers, config)
+
 	if err != nil {
 		log.Fatal(err)
 	}
-	return
+	return &client
 }
 
 func produce(client *sarama.Client, topic string, events int) {
-	producer, err := sarama.NewProducer(client, topic, &producerConfig)
+	producer, err := sarama.NewSyncProducer([]string{*brokerAddress}, config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -76,16 +74,16 @@ func produce(client *sarama.Client, topic string, events int) {
 
 	log.Printf("Sending %d messages to topic '%s'\n", events, topic)
 
-	message := DummyMessage{
+	message := dummyMessage{
 		ts:   1384205271.861,
 		host: "dummy.host",
-		msg: InnerMessage{
+		msg: innerMessage{
 			previousTimestamp: 1384205268645,
 			timestamp:         1384205271861,
 			metric:            "location",
-			cityId:            42,
+			cityID:            42,
 			cityName:          "foo",
-			vehicleViewId:     442,
+			vehicleViewID:     442,
 			vehicleUUID:       "aoeu-aoeu-aoeu-aoeu-aoeu",
 			timeNotOnTrip:     3430946,
 			dummyStatus:       "something",
@@ -97,28 +95,37 @@ func produce(client *sarama.Client, topic string, events int) {
 	}
 
 	for i := 0; i < events; i++ {
-		producer.SendMessage(nil, sarama.ByteEncoder(encoded))
+		producer.SendMessage(&sarama.ProducerMessage{
+			Topic: topic,
+			Value: sarama.ByteEncoder(encoded),
+		})
 	}
 }
 
 func consume(client *sarama.Client, topic string, events int) {
-	consumer, err := sarama.NewConsumer(client, topic, 0, "bench-group", &consumerConfig)
+	consumer, err := sarama.NewConsumer([]string{*brokerAddress}, config)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer consumer.Close()
 
+	pc, err := consumer.ConsumePartition(topic, 0, sarama.OffsetNewest)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer pc.Close()
+
 	log.Printf("Reading %d events from '%s' topic", events, topic)
 	count := 0
-	var message DummyMessage
-	for event := range consumer.Events() {
-		if err := json.Unmarshal(event.Value, &message); err != nil {
+	var message dummyMessage
+	for message := range pc.Messages() {
+		if err := json.Unmarshal(message.Value, &message); err != nil {
 			log.Fatal("Unable to decode JSON message", err)
 		}
 
 		count++
 		if count == events {
-			log.Printf("Received final (%d) event: %s", count, string(event.Value))
+			log.Printf("Received final (%d) event: %s", count, string(message.Value))
 			return
 		}
 	}
@@ -136,7 +143,7 @@ func main() {
 		return
 	}
 	client := getClient(*brokerAddress)
-	defer client.Close()
+	defer log.Println(client.Close())
 
 	now := time.Now()
 	if flag.Args()[0] == "produce" {
