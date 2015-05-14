@@ -123,6 +123,9 @@ func consume(client *sarama.Client, topic string, events int, done chan<- struct
 		}
 
 		count++
+		if count%10000 == 0 {
+			log.Printf("Read %d events, offset: %d\n", count, message.Offset)
+		}
 		if count == events {
 			log.Printf("Received final (%d) event: %s", count, string(message.Value))
 			close(done)
