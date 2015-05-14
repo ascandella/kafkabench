@@ -102,7 +102,7 @@ func produce(client *sarama.Client, topic string, events int) {
 	}
 }
 
-func consume(client *sarama.Client, topic string, events int) {
+func consume(client *sarama.Client, topic string, events int, done chan<- struct{}) {
 	consumer, err := sarama.NewConsumer(brokers, config)
 	if err != nil {
 		log.Fatal(err)
@@ -125,6 +125,7 @@ func consume(client *sarama.Client, topic string, events int) {
 		count++
 		if count == events {
 			log.Printf("Received final (%d) event: %s", count, string(message.Value))
+			close(done)
 			return
 		}
 	}
@@ -137,20 +138,15 @@ func usage() {
 
 func main() {
 	flag.Parse()
-	if flag.NArg() == 0 {
-		usage()
-		return
-	}
 	brokers = []string{*brokerAddress}
 	client := getClient(brokers)
-	// defer log.Println(client.Close())
 
 	now := time.Now()
-	if flag.Args()[0] == "produce" {
-		produce(client, *topicName, *eventCount)
-	} else {
-		consume(client, *topicName, *eventCount)
-	}
+	done := make(chan struct{})
+	go consume(client, *topicName, *eventCount, done)
+	go produce(client, *topicName, *eventCount)
+
+	<-done
 	ellapsed := time.Now().Sub(now)
 	log.Printf("Finished in %s", ellapsed)
 }

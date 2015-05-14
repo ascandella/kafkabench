@@ -19,6 +19,4 @@ Running
 
 .. code-block:: bash
 
-    $ go build
-    $ ./kafkabench produce
-    $ ./kafkabench consume
+    $ go run kafkabench.go
