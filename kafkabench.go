@@ -105,7 +105,7 @@ func produce(client *sarama.Client, topic string, events int, done chan<- struct
 	close(done)
 }
 
-func consume(client *sarama.Client, topic string, events int, done <-chan struct{}) {
+func consume(client *sarama.Client, topic string, done <-chan struct{}) {
 	consumer, err := sarama.NewConsumer(brokers, config)
 	if err != nil {
 		log.Fatal(err)
@@ -118,7 +118,7 @@ func consume(client *sarama.Client, topic string, events int, done <-chan struct
 	}
 	defer pc.Close()
 
-	log.Printf("Reading %d events from '%s' topic", events, topic)
+	log.Printf("Reading events from '%s' topic", topic)
 	count := 0
 	select {
 	case message := <-pc.Messages():
@@ -148,10 +148,12 @@ func main() {
 
 	now := time.Now()
 	done := make(chan struct{})
+
 	go produce(client, *topicName, *eventCount, done)
-	go consume(client, *topicName, *eventCount, done)
+	go consume(client, *topicName, done)
 
 	<-done
+
 	ellapsed := time.Now().Sub(now)
 	log.Printf("Finished in %s", ellapsed)
 }
