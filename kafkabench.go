@@ -22,6 +22,7 @@ var (
 	eventCount    = flag.Int("events", defaultEventCount, "number of events to produce")
 	topicName     = flag.String("topic", defaultTopicName, "kafka topic to use")
 	config        = sarama.NewConfig()
+	brokers       []string
 )
 
 func init() {
@@ -53,8 +54,7 @@ type dummyMessage struct {
 	msg  innerMessage
 }
 
-func getClient(addr string) *sarama.Client {
-	brokers := []string{*brokerAddress}
+func getClient(brokers []string) *sarama.Client {
 	log.Println("Connecting to brokers: ", brokers)
 
 	client, err := sarama.NewClient(brokers, config)
@@ -66,7 +66,7 @@ func getClient(addr string) *sarama.Client {
 }
 
 func produce(client *sarama.Client, topic string, events int) {
-	producer, err := sarama.NewSyncProducer([]string{*brokerAddress}, config)
+	producer, err := sarama.NewSyncProducer(brokers, config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func produce(client *sarama.Client, topic string, events int) {
 }
 
 func consume(client *sarama.Client, topic string, events int) {
-	consumer, err := sarama.NewConsumer([]string{*brokerAddress}, config)
+	consumer, err := sarama.NewConsumer(brokers, config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -141,8 +141,9 @@ func main() {
 		usage()
 		return
 	}
-	client := getClient(*brokerAddress)
-	defer log.Println(client.Close())
+	brokers = []string{*brokerAddress}
+	client := getClient(brokers)
+	// defer log.Println(client.Close())
 
 	now := time.Now()
 	if flag.Args()[0] == "produce" {
