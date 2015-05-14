@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"runtime"
 	"time"
 
 	"gopkg.in/shopify/sarama.v1"
@@ -65,7 +66,7 @@ func getClient(brokers []string) *sarama.Client {
 	return &client
 }
 
-func produce(client *sarama.Client, topic string, events int) {
+func produce(client *sarama.Client, topic string, events int, done chan<- struct{}) {
 	producer, err := sarama.NewSyncProducer(brokers, config)
 	if err != nil {
 		log.Fatal(err)
@@ -100,9 +101,11 @@ func produce(client *sarama.Client, topic string, events int) {
 			Value: sarama.ByteEncoder(encoded),
 		})
 	}
+
+	close(done)
 }
 
-func consume(client *sarama.Client, topic string, events int, done chan<- struct{}) {
+func consume(client *sarama.Client, topic string, events int, done <-chan struct{}) {
 	consumer, err := sarama.NewConsumer(brokers, config)
 	if err != nil {
 		log.Fatal(err)
@@ -117,7 +120,8 @@ func consume(client *sarama.Client, topic string, events int, done chan<- struct
 
 	log.Printf("Reading %d events from '%s' topic", events, topic)
 	count := 0
-	for message := range pc.Messages() {
+	select {
+	case message := <-pc.Messages():
 		if err := json.Unmarshal(message.Value, &message); err != nil {
 			log.Fatal("Unable to decode JSON message", err)
 		}
@@ -126,11 +130,8 @@ func consume(client *sarama.Client, topic string, events int, done chan<- struct
 		if count%10000 == 0 {
 			log.Printf("Read %d events, offset: %d\n", count, message.Offset)
 		}
-		if count == events {
-			log.Printf("Received final (%d) event: %s", count, string(message.Value))
-			close(done)
-			return
-		}
+	case <-done:
+		log.Printf("Received final (%d) events", count)
 	}
 }
 
@@ -140,14 +141,15 @@ func usage() {
 }
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
 	brokers = []string{*brokerAddress}
 	client := getClient(brokers)
 
 	now := time.Now()
 	done := make(chan struct{})
+	go produce(client, *topicName, *eventCount, done)
 	go consume(client, *topicName, *eventCount, done)
-	go produce(client, *topicName, *eventCount)
 
 	<-done
 	ellapsed := time.Now().Sub(now)
