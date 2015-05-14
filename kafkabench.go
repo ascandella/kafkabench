@@ -25,8 +25,8 @@ var (
 )
 
 func init() {
-	config.Producer.Timeout = 1000
-	config.Consumer.MaxWaitTime = 100
+	config.Producer.Timeout = time.Millisecond * 1000
+	config.Consumer.MaxWaitTime = time.Millisecond * 100
 }
 
 type innerMessage struct {
@@ -117,7 +117,6 @@ func consume(client *sarama.Client, topic string, events int) {
 
 	log.Printf("Reading %d events from '%s' topic", events, topic)
 	count := 0
-	var message dummyMessage
 	for message := range pc.Messages() {
 		if err := json.Unmarshal(message.Value, &message); err != nil {
 			log.Fatal("Unable to decode JSON message", err)
