@@ -67,7 +67,7 @@ func getClient(brokers []string) *sarama.Client {
 }
 
 func produce(client *sarama.Client, topic string, events int, done chan<- struct{}) {
-	producer, err := sarama.NewSyncProducer(brokers, config)
+	producer, err := sarama.NewSyncProducerFromClient(*client)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func produce(client *sarama.Client, topic string, events int, done chan<- struct
 }
 
 func consume(client *sarama.Client, topic string, done <-chan struct{}) {
-	consumer, err := sarama.NewConsumer(brokers, config)
+	consumer, err := sarama.NewConsumerFromClient(*client)
 	if err != nil {
 		log.Fatal(err)
 	}
