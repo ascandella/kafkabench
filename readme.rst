@@ -12,7 +12,7 @@ and running.
 .. code-block:: bash
 
     $ bin/kafka-create-topic.sh --zookeeper localhost:2181 --replica 1 --partition 1 --topic benchmark
-    $ go get "github.com/Shopify/sarama"
+    $ go get gopkg.in/Shopify/sarama.v1
 
 Running
 -------

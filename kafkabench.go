@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"time"
 
-	"gopkg.in/shopify/sarama.v1"
+	"gopkg.in/Shopify/sarama.v1"
 )
 
 const (
